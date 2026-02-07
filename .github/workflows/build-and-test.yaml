@@ -1,0 +1,23 @@
+name: C++ CI Build and Test
+
+on:
+  pull_request:
+    branches: [ main ] # Modify this to your target branch name
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest # You can also use windows-latest or macos-latest
+
+    steps:
+    - uses: actions/checkout@v4 # Step 1: Check out the repository code
+
+    - name: Configure CMake
+      run: cmake -Bbuild # Step 2: Configure the project in a 'build' directory
+
+    - name: Build Project
+      run: cmake --build build # Step 3: Build the project
+
+    - name: Run CTest
+      run: |
+        cd build
+        ctest --output-on-failure # Step 4: Run the tests using CTest, showing output for failures
