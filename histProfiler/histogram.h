@@ -14,13 +14,13 @@
 
 namespace profiler
 {
-	template<size_t NumBucket>
+	template<size_t NumBucket, size_t SamplesPerBucket>
 	struct Histogram final
 	{
 	public:
 		Histogram() = default;
-		Histogram(const std::string& label, size_t samplesPerBucket)
-			:_samplesPerBucket{samplesPerBucket}
+		Histogram(const std::string& label)
+			:_samplesPerBucket{SamplesPerBucket}
 		{
 			std::fill(_buckets.begin(), _buckets.end(), 0);
 
@@ -46,8 +46,9 @@ namespace profiler
 		}
 
 		constexpr size_t getNumBuckets() const noexcept { return NumBucket; }
+		constexpr uint64_t getHistMagicID() const noexcept { return 0x0101010101010101; }
 
-		std::array<uint64_t, NumBucket + 1> _buckets;
+		uint64_t _histId{getHistMagicID()}; // used by shm readers, shm file could store different types 
 		uint64_t _maxSample{ 0 };
 		uint64_t _minSample{ 0xfffffffffffffffLL };
 		uint64_t _overfows{ 0 };
@@ -56,6 +57,7 @@ namespace profiler
 		uint64_t _samplesPerBucket{0};
 		uint64_t _labelLen{0};
 		std::array<char, 256> _label;
+		std::array<uint64_t, NumBucket + 1> _buckets;
 	};
 
 	inline double safeDiv(uint64_t sum, uint64_t num) noexcept

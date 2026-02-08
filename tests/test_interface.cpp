@@ -19,7 +19,7 @@ void wasteTime(size_t cnt)
 
 int testMacros()
 {
-	profiler::Histogram<200> hist{"basic test of micros", 1000};
+	profiler::Histogram<200, 1000> hist{"basic test of micros"};
 
 	std::random_device rd{};
 	std::mt19937 gen{ rd() };
@@ -40,7 +40,7 @@ int testMacros()
 }
 int testMillis()
 {
-	profiler::Histogram<100> hist{"basic test of millis", 1'000'000};
+	profiler::Histogram<100, 1'000'000> hist{"basic test of millis"};
 
 	std::random_device rd{};
 	std::mt19937 gen{ rd() };
@@ -62,7 +62,7 @@ int testMillis()
 
 int testShmHist()
 {
-	profiler::shmFile<profiler::Histogram<100>> shmCont{"basicTestMillisInShm", "basic test of millis", 1'000'000};
+	profiler::shmFile<profiler::Histogram<100, 1'000'000>> shmCont{"basicTestMillisInShm", "basic test of millis"};
 	auto& hist{shmCont.get()};
 
 	std::random_device rd{};
