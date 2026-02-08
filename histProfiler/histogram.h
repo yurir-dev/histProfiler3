@@ -142,8 +142,13 @@ namespace profiler
 				throw std::runtime_error{"FAILED to open " + std::string{filename} + ", errno: " + std::strerror(err)};
 			}
 
-			::ftruncate(raii._fd, sizeof(ObjType));
-		
+			auto res = ::ftruncate(raii._fd, sizeof(ObjType));
+			if (res == -1)
+			{
+				const auto err{ errno };
+				throw std::runtime_error{"FAILED to ftruncate " + std::string{filename} + ", errno: " + std::strerror(err)};
+			}
+
 			void* beginAddr = mmap(NULL, sizeof(ObjType), PROT_READ | PROT_WRITE, MAP_SHARED, raii._fd, 0);
 			if (beginAddr == MAP_FAILED)
 			{
