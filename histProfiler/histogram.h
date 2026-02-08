@@ -12,7 +12,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-namespace profiler
+namespace histProfiler
 {
 	template<size_t NumBucket, size_t SamplesPerBucket>
 	struct Histogram final
@@ -121,13 +121,13 @@ namespace profiler
 	};
 
 	template<typename ObjType>
-	class shmFile final
+	class ShmFile final
 	{
 	public:	
-		shmFile() = default;
+		ShmFile() = default;
 
 		template <typename... Ts>
-		shmFile(std::filesystem::path filename, Ts... args)
+		ShmFile(std::filesystem::path filename, Ts... args)
 		{
 			struct RAII final
 			{
@@ -161,11 +161,11 @@ namespace profiler
     		std::cout << "Success to create shmFile: " << filename << ", addr: " << beginAddr << std::endl;
 		}
 
-		shmFile(shmFile&&) = default;
-		shmFile& operator=(shmFile&&) = default;
-		shmFile(shmFile&) = delete;
-		shmFile& operator=(shmFile&) = delete;
-		~shmFile()
+		ShmFile(ShmFile&&) = default;
+		ShmFile& operator=(ShmFile&&) = default;
+		ShmFile(ShmFile&) = delete;
+		ShmFile& operator=(ShmFile&) = delete;
+		~ShmFile()
 		{
 			if (_objPtr != nullptr)
 			{
@@ -189,4 +189,4 @@ namespace profiler
 		private:
 		ObjType* _objPtr{nullptr};
 	};
-}
+} // namespace histProfiler

@@ -19,7 +19,7 @@ void wasteTime(size_t cnt)
 
 int testMacros()
 {
-	profiler::Histogram<200, 1000> hist{"basic test of micros"};
+	histProfiler::Histogram<200, 1000> hist{"basic test of micros"};
 
 	std::random_device rd{};
 	std::mt19937 gen{ rd() };
@@ -27,9 +27,9 @@ int testMacros()
 
 	for (size_t i = 0; i < 1024 * 1024; i++)
 	{
-		size_t timeToWaist = static_cast<size_t>(std::round(dist(gen)));
+		const auto timeToWaist{static_cast<size_t>(std::round(dist(gen)))};
 		{
-			profiler::ScopedHistSampler shs{hist};
+			histProfiler::ScopedHistSampler shs{hist};
 			wasteTime(timeToWaist);
 		}
 	}
@@ -40,7 +40,7 @@ int testMacros()
 }
 int testMillis()
 {
-	profiler::Histogram<100, 1'000'000> hist{"basic test of millis"};
+	histProfiler::Histogram<100, 1'000'000> hist{"basic test of millis"};
 
 	std::random_device rd{};
 	std::mt19937 gen{ rd() };
@@ -48,9 +48,9 @@ int testMillis()
 
 	for (size_t i = 0; i < 1024 ; i++)
 	{
-		size_t timeToWaist = static_cast<size_t>(std::round(dist(gen)));
+		const auto timeToWaist{static_cast<size_t>(std::round(dist(gen)))};
 		{
-			profiler::ScopedHistSampler shs{hist};
+			histProfiler::ScopedHistSampler shs{hist};
 			std::this_thread::sleep_for(std::chrono::milliseconds{timeToWaist});
 		}
 	}
@@ -62,7 +62,7 @@ int testMillis()
 
 int testShmHist()
 {
-	profiler::shmFile<profiler::Histogram<100, 1'000'000>> shmCont{"basicTestMillisInShm", "basic test of millis"};
+	histProfiler::ShmFile<histProfiler::Histogram<100, 1'000'000>> shmCont{"basicTestMillisInShm", "basic test of millis"};
 	auto& hist{shmCont.get()};
 
 	std::random_device rd{};
@@ -71,9 +71,9 @@ int testShmHist()
 
 	for (size_t i = 0; i < 1024 ; i++)
 	{
-		size_t timeToWaist = static_cast<size_t>(std::round(dist(gen)));
+		const auto timeToWaist{static_cast<size_t>(std::round(dist(gen)))};
 		{
-			profiler::ScopedHistSampler shs{hist};
+			histProfiler::ScopedHistSampler shs{hist};
 			std::this_thread::sleep_for(std::chrono::milliseconds{timeToWaist});
 		}
 	}
