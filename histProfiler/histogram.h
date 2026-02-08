@@ -6,6 +6,11 @@
 #include <cstring>
 #include <chrono>
 #include <cmath>
+#include <cerrno>
+#include <filesystem>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 namespace profiler
 {
@@ -111,5 +116,70 @@ namespace profiler
 
 		HistType& _histRef;
 		std::chrono::time_point<std::chrono::steady_clock> _startTP;
+	};
+
+	template<typename ObjType>
+	class shmFile final
+	{
+	public:	
+		shmFile() = default;
+
+		template <typename... Ts>
+		shmFile(std::filesystem::path filename, Ts... args)
+		{
+			struct RAII final
+			{
+				int _fd{ -1 };
+				~RAII() { if (_fd != -1) { close(_fd); } }
+			};
+			RAII raii;
+    		raii._fd = ::open(filename.c_str(), O_CREAT | O_RDWR | O_TRUNC, 0644);
+			if (-1 == raii._fd)
+			{
+				const auto err{ errno };
+				throw std::runtime_error{"FAILED to open " + std::string{filename} + ", errno: " + std::strerror(err)};
+			}
+
+			::ftruncate(raii._fd, sizeof(ObjType));
+		
+			void* beginAddr = mmap(NULL, sizeof(ObjType), PROT_READ | PROT_WRITE, MAP_SHARED, raii._fd, 0);
+			if (beginAddr == MAP_FAILED)
+			{
+				const auto err{ errno };
+				throw std::runtime_error{"FAILED to mmap " + std::string{filename} + ", errno: " + std::strerror(err)};
+			}
+
+			_objPtr = new (beginAddr) ObjType(args...);
+		
+    		std::cout << "Success to create shmFile: " << filename << ", addr: " << beginAddr << std::endl;
+		}
+
+		shmFile(shmFile&&) = default;
+		shmFile& operator=(shmFile&&) = default;
+		shmFile(shmFile&) = delete;
+		shmFile& operator=(shmFile&) = delete;
+		~shmFile()
+		{
+			if (_objPtr != nullptr)
+			{
+    			if (-1 == msync(_objPtr, sizeof(ObjType), MS_SYNC))
+				{
+					const auto err{ errno };
+					std::cerr << __FILE__ << ':' << __LINE__
+						<< " FAILED to msync addr: " << static_cast<void*>(_objPtr) << ", errno: " << std::strerror(err) << std::endl;
+				}
+				if (-1 == munmap(_objPtr, sizeof(ObjType)))
+				{
+					const auto err{ errno };
+					std::cerr << __FILE__ << ':' << __LINE__
+						<< " FAILED to munmap addr: " << static_cast<void*>(_objPtr) << ", errno: " << std::strerror(err) << std::endl;
+				}
+			}
+		}
+
+		ObjType& get() {return *_objPtr;}
+
+		private:
+		ObjType* _objPtr{nullptr};
 	};
 }
