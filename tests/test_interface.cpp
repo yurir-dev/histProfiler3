@@ -27,7 +27,8 @@ int testMacros()
 
 	for (size_t i = 0; i < 1024 * 1024; i++)
 	{
-		const auto timeToWaist{static_cast<size_t>(std::round(dist(gen)))};
+		const auto randomVal{std::round(dist(gen))};
+		const auto timeToWaist{randomVal > 0 ? static_cast<size_t>(randomVal) : 0};
 		{
 			histProfiler::ScopedHistSampler shs{hist};
 			wasteTime(timeToWaist);
@@ -48,14 +49,15 @@ int testMillis()
 
 	for (size_t i = 0; i < 1024 ; i++)
 	{
-		const auto timeToWaist{static_cast<size_t>(std::round(dist(gen)))};
+		const auto randomVal{std::round(dist(gen))};
+		const auto timeToWaist{randomVal > 0 ? static_cast<size_t>(randomVal) : 0};
 		{
 			histProfiler::ScopedHistSampler shs{hist};
 			std::this_thread::sleep_for(std::chrono::milliseconds{timeToWaist});
 		}
 	}
 
-	dumpHistogram(std::cout, hist);
+	histProfiler::dumpHistogram(std::cout, hist);
 
 	return 0;
 }
@@ -71,18 +73,65 @@ int testShmHist()
 
 	for (size_t i = 0; i < 1024 ; i++)
 	{
-		const auto timeToWaist{static_cast<size_t>(std::round(dist(gen)))};
+		const auto randomVal{std::round(dist(gen))};
+		const auto timeToWaist{randomVal > 0 ? static_cast<size_t>(randomVal) : 0};
 		{
 			histProfiler::ScopedHistSampler shs{hist};
 			std::this_thread::sleep_for(std::chrono::milliseconds{timeToWaist});
 		}
 	}
 
-	dumpHistogram(std::cout, hist);
+	histProfiler::dumpHistogram(std::cout, hist);
 
 	return 0;
 }
 
+int testRateCounter()
+{
+	histProfiler::RateCounter<16> rateCnt{"basic test of rate counter"};
+
+	std::random_device rd{};
+	std::mt19937 gen{ rd() };
+	std::normal_distribution<> dist{ 20, 2 };
+
+	const auto endTP{std::chrono::steady_clock::now() + std::chrono::seconds{30}};
+	while(std::chrono::steady_clock::now() < endTP)
+	{
+		rateCnt.sample();
+
+		const auto randomVal{std::round(dist(gen))};
+		const auto timeToWaist{randomVal > 0 ? static_cast<size_t>(randomVal) : 0};
+		std::this_thread::sleep_for(std::chrono::milliseconds{timeToWaist});
+	}
+
+	histProfiler::dumpRateCounter(std::cout, rateCnt);
+
+	return 0;
+}
+
+int testShmRateCounter()
+{
+	histProfiler::ShmFile<histProfiler::RateCounter<16>> shmCont{"basicTestRateCounter", "basic test of rate counter"};
+	auto& rateCnt{shmCont.get()};
+
+	std::random_device rd{};
+	std::mt19937 gen{ rd() };
+	std::normal_distribution<> dist{ 20, 2 };
+
+	const auto endTP{std::chrono::steady_clock::now() + std::chrono::seconds{30}};
+	while(std::chrono::steady_clock::now() < endTP)
+	{
+		rateCnt.sample();
+
+		const auto randomVal{std::round(dist(gen))};
+		const auto timeToWaist{randomVal > 0 ? static_cast<size_t>(randomVal) : 0};
+		std::this_thread::sleep_for(std::chrono::milliseconds{timeToWaist});
+	}
+
+	histProfiler::dumpRateCounter(std::cout, rateCnt);
+
+	return 0;
+}
 
 int main(int /*argc*/, char* /*argv*/ [])
 {
@@ -95,6 +144,14 @@ int main(int /*argc*/, char* /*argv*/ [])
 		return res;
 	}
 	if (auto res = testShmHist() ; res != 0)
+	{
+		return res;
+	}
+	if (auto res = testRateCounter() ; res != 0)
+	{
+		return res;
+	}
+	if (auto res = testShmRateCounter() ; res != 0)
 	{
 		return res;
 	}

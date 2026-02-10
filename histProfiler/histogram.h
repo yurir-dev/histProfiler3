@@ -120,6 +120,44 @@ namespace histProfiler
 		std::chrono::time_point<std::chrono::steady_clock> _startTP;
 	};
 
+	template<size_t WindowSize>
+	class RateCounter final
+	{
+	public:
+		RateCounter(const std::string& label)
+		{
+			_counterLen = WindowSize;
+			std::fill(_numPerSecond.begin(), _numPerSecond.end(), 0);
+
+			_labelLen = std::min(_label.size(), label.size());
+			std::strncpy(_label.data(), label.c_str(), _labelLen);
+		}
+		void sample(uint64_t val = 1)
+		{
+			const auto seconds{std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count()};
+			_numPerSecond[seconds % _numPerSecond.size()] += val;
+			_numPerSecond[(seconds + 1) % _numPerSecond.size()] = 0;
+		}
+
+		uint64_t _labelLen{0};
+		std::array<char, 256> _label;
+		uint64_t _counterLen{0};
+		std::array<uint64_t, WindowSize> _numPerSecond;
+
+	};
+
+	template <typename RateCounterType>
+	std::ostream& dumpRateCounter(std::ostream& os, const RateCounterType& rateCnt)
+	{
+		os << std::string_view{rateCnt._label.data(), rateCnt._labelLen} << "\n[";
+		for (auto val : rateCnt._numPerSecond)
+		{
+			os << val << ',';
+		}
+		os << ']';
+		return os;
+	}
+
 	template<typename ObjType>
 	class ShmFile final
 	{
