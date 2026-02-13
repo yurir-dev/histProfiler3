@@ -20,7 +20,7 @@ namespace histProfiler
 	public:
 		Histogram() = default;
 		Histogram(const std::string& label)
-			:_samplesPerBucket{SamplesPerBucket}
+			:_samplesPerBucket{SamplesPerBucket}, _bucketsLen{NumBucket}
 		{
 			std::fill(_buckets.begin(), _buckets.end(), 0);
 
@@ -48,7 +48,7 @@ namespace histProfiler
 		constexpr size_t getNumBuckets() const noexcept { return NumBucket; }
 		constexpr uint64_t getHistMagicID() const noexcept { return 0x0101010101010101; }
 
-		uint64_t _histId{getHistMagicID()}; // used by shm readers, shm file could store different types 
+		uint64_t _id{getHistMagicID()}; // used by shm readers, shm file could store different types 
 		uint64_t _maxSample{ 0 };
 		uint64_t _minSample{ 0xfffffffffffffffLL };
 		uint64_t _overfows{ 0 };
@@ -57,6 +57,7 @@ namespace histProfiler
 		uint64_t _samplesPerBucket{0};
 		uint64_t _labelLen{0};
 		std::array<char, 256> _label;
+		uint64_t _bucketsLen;
 		std::array<uint64_t, NumBucket + 1> _buckets;
 	};
 
@@ -139,6 +140,9 @@ namespace histProfiler
 			_numPerSecond[(seconds + 1) % _numPerSecond.size()] = 0;
 		}
 
+		constexpr uint64_t getRateCounterMagicID() const noexcept { return 0x0202020202020202; }
+
+		uint64_t _id{getRateCounterMagicID()}; // used by shm readers, shm file could store different types 
 		uint64_t _labelLen{0};
 		std::array<char, 256> _label;
 		uint64_t _counterLen{0};
