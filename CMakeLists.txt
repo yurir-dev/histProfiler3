@@ -16,12 +16,12 @@ else()
     endif()
 endif()
 
-include_directories(${CMAKE_SOURCE_DIR} histProfiler)
+include_directories(${CMAKE_SOURCE_DIR} telemetry)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-set (HIST_PROFILER 	histProfiler/histogram.h)
+set (HIST_PROFILER 	telemetry/latency_stats.h)
 set (SOURCES main.cpp  ${HIST_PROFILER})
 
 set(ENABLE_HIST_PROFILER "true" CACHE BOOL "enables the profiler")

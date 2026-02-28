@@ -20,7 +20,7 @@ def median(num, buckets):
 
 def readDumpHistogram(f):
     header_data = f.read(8 * 7)
-    _maxSample, _minSample, _overfows, _sum, _numSamples, _samplesPerBucket, _labelLen  = struct.unpack("<7Q", header_data)
+    _maxSample, _minSample, _overflows, _sum, _numSamples, _samplesPerBucket, _labelLen  = struct.unpack("<7Q", header_data)
 
     # label
     label_data = f.read(256)
@@ -33,7 +33,7 @@ def readDumpHistogram(f):
     buckets = struct.unpack(f"<{bucketLen}Q", buckets_data)
 
     desc = f"{label}\n"
-    desc += f"#buckets: {bucketLen}, #samples: {_numSamples}, #samples: {_overfows}, ns/bucket: {_samplesPerBucket}\n"
+    desc += f"#buckets: {bucketLen}, #samples: {_numSamples}, #overflows: {_overflows}, ns/bucket: {_samplesPerBucket}\n"
 
     meanNS = safe_div(_sum, _numSamples)
     meanUnits = safe_div(meanNS, _samplesPerBucket)
@@ -66,13 +66,13 @@ def readFile(fileName):
         else:
             return f"unknown magic id: {id}"
 
-def runWebserver(fileName):
+def runWebserver(fileName_):
     # HTML and JavaScript content
     HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Dynamic Data Graph</title>
+    <title>@fileNameTuReplace</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -126,6 +126,8 @@ def runWebserver(fileName):
 </body>
 </html>
 """    
+    print(f"using {fileName_}")
+    HTML_CONTENT = HTML_TEMPLATE.replace('@fileNameTuReplace', fileName_)
     def generate_data(fileName):
         desc, data = readFile(fileName)
         return {
@@ -144,11 +146,11 @@ def runWebserver(fileName):
     @app.route('/')
     def index():
         # Serving a minimal HTML structure; JS will do the heavy lifting
-        return render_template_string(HTML_TEMPLATE)
+        return render_template_string(HTML_CONTENT)
 
     @app.route('/api/data')
     def get_data():
-        return jsonify(generate_data(fileName))
+        return jsonify(generate_data(fileName_))
 
     
     app.run(debug=True)

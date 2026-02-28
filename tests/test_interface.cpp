@@ -5,7 +5,12 @@
 #include <thread>
 #include <chrono>
 
-#include "histogram.h"
+#include "latency_stats.h"
+
+void move_to_register(const volatile void* ptr) {
+	// Tells the compiler: "I'm using this memory, don't optimize the math that created it."
+    asm volatile("" : : "g"(ptr) : "memory");
+}
 
 void wasteTime(size_t cnt)
 {
@@ -14,12 +19,13 @@ void wasteTime(size_t cnt)
 		volatile double s = std::sqrt(i + 1024 * 1024);
 		s = s * s;
 		s = std::sqrt(s);
+		move_to_register(&s);
 	}
 }
 
-int testMacros()
+int testMicros()
 {
-	histProfiler::Histogram<200, 1000> hist{"basic test of micros"};
+	hprof::Histogram<200, 1000> hist{"basic test of micros"};
 
 	std::random_device rd{};
 	std::mt19937 gen{ rd() };
@@ -30,7 +36,7 @@ int testMacros()
 		const auto randomVal{std::round(dist(gen))};
 		const auto timeToWaist{randomVal > 0 ? static_cast<size_t>(randomVal) : 0};
 		{
-			histProfiler::ScopedHistSampler shs{hist};
+			hprof::ScopedHistSampler shs{hist};
 			wasteTime(timeToWaist);
 		}
 	}
@@ -41,7 +47,7 @@ int testMacros()
 }
 int testMillis()
 {
-	histProfiler::Histogram<100, 1'000'000> hist{"basic test of millis"};
+	hprof::Histogram<100, 1'000'000> hist{"basic test of millis"};
 
 	std::random_device rd{};
 	std::mt19937 gen{ rd() };
@@ -52,43 +58,45 @@ int testMillis()
 		const auto randomVal{std::round(dist(gen))};
 		const auto timeToWaist{randomVal > 0 ? static_cast<size_t>(randomVal) : 0};
 		{
-			histProfiler::ScopedHistSampler shs{hist};
+			hprof::ScopedHistSampler shs{hist};
 			std::this_thread::sleep_for(std::chrono::milliseconds{timeToWaist});
 		}
 	}
 
-	histProfiler::dumpHistogram(std::cout, hist);
+	hprof::dumpHistogram(std::cout, hist);
 
 	return 0;
 }
 
 int testShmHist()
 {
-	histProfiler::ShmFile<histProfiler::Histogram<100, 1'000'000>> shmCont{"basicTestMillisInShm", "basic test of millis"};
+	hprof::ShmFile<hprof::Histogram<100, 1'000'000>> shmCont{"basicTestMillisInShm", 
+															hprof::OpenFilePolicy::CreateNew,
+															"basic test of millis"};
 	auto& hist{shmCont.get()};
 
 	std::random_device rd{};
 	std::mt19937 gen{ rd() };
-	std::normal_distribution<> dist{ 50, 10 };
+	std::normal_distribution<> dist{ 50, 2 };
 
 	for (size_t i = 0; i < 1024*1024 ; i++)
 	{
 		const auto randomVal{std::round(dist(gen))};
 		const auto timeToWaist{randomVal > 0 ? static_cast<size_t>(randomVal) : 0};
 		{
-			histProfiler::ScopedHistSampler shs{hist};
+			hprof::ScopedHistSampler shs{hist};
 			std::this_thread::sleep_for(std::chrono::milliseconds{timeToWaist});
 		}
 	}
 
-	histProfiler::dumpHistogram(std::cout, hist);
+	hprof::dumpHistogram(std::cout, hist);
 
 	return 0;
 }
 
 int testRateCounter()
 {
-	histProfiler::RateCounter<16> rateCnt{"basic test of rate counter"};
+	hprof::RateCounter<16> rateCnt{"basic test of rate counter"};
 
 	std::random_device rd{};
 	std::mt19937 gen{ rd() };
@@ -104,14 +112,16 @@ int testRateCounter()
 		std::this_thread::sleep_for(std::chrono::milliseconds{timeToWaist});
 	}
 
-	histProfiler::dumpRateCounter(std::cout, rateCnt);
+	hprof::dumpRateCounter(std::cout, rateCnt);
 
 	return 0;
 }
 
 int testShmRateCounter()
 {
-	histProfiler::ShmFile<histProfiler::RateCounter<128>> shmCont{"basicTestRateCounter", "basic test of rate counter"};
+	hprof::ShmFile<hprof::RateCounter<128>> shmCont{"basicTestRateCounter", 
+													hprof::OpenFilePolicy::ReuseIfExists,
+													"basic test of rate counter"};
 	auto& rateCnt{shmCont.get()};
 
 	std::random_device rd{};
@@ -128,14 +138,48 @@ int testShmRateCounter()
 		std::this_thread::sleep_for(std::chrono::milliseconds{timeToWaist});
 	}
 
-	histProfiler::dumpRateCounter(std::cout, rateCnt);
+	hprof::dumpRateCounter(std::cout, rateCnt);
+
+	return 0;
+}
+
+int testShmRateCounterWithGaps()
+{
+	hprof::ShmFile<hprof::RateCounter<128>> shmCont{"basicTestRateCounterGaps", 
+													hprof::OpenFilePolicy::ReuseIfExists,
+													"gap detection test of rate counter"};
+	auto& rateCnt{shmCont.get()};
+
+	std::random_device rd{};
+	std::mt19937 gen{ rd() };
+	std::normal_distribution<> dist{ 20, 2 };
+
+	const auto endTP{std::chrono::steady_clock::now() + std::chrono::seconds{600}};
+	while(std::chrono::steady_clock::now() < endTP)
+	{
+		rateCnt.sample();
+
+		const auto seconds{std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count()};
+		if (seconds % 30 == 0)
+		{
+			std::this_thread::sleep_for(std::chrono::seconds{10});
+		}
+		else
+		{
+			const auto randomVal{std::round(dist(gen))};
+			const auto timeToWaist{randomVal > 0 ? static_cast<size_t>(randomVal) : 0};
+			std::this_thread::sleep_for(std::chrono::milliseconds{timeToWaist});
+		}
+	}
+
+	hprof::dumpRateCounter(std::cout, rateCnt);
 
 	return 0;
 }
 
 int main(int /*argc*/, char* /*argv*/ [])
 {
-	if (auto res = testMacros() ; res != 0)
+	if (auto res = testMicros() ; res != 0)
 	{
 		return res;
 	}
@@ -155,5 +199,9 @@ int main(int /*argc*/, char* /*argv*/ [])
 	{
 		return res;
 	}
+	//if (auto res = testShmRateCounterWithGaps() ; res != 0)
+	//
+	//	return res;
+	//
 	return 0;
 }
