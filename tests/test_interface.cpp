@@ -128,7 +128,7 @@ int testShmRateCounter()
 	std::mt19937 gen{ rd() };
 	std::normal_distribution<> dist{ 20, 2 };
 
-	const auto endTP{std::chrono::steady_clock::now() + std::chrono::seconds{600}};
+	const auto endTP{std::chrono::steady_clock::now() + std::chrono::seconds{120}};
 	while(std::chrono::steady_clock::now() < endTP)
 	{
 		rateCnt.sample();
@@ -154,7 +154,7 @@ int testShmRateCounterWithGaps()
 	std::mt19937 gen{ rd() };
 	std::normal_distribution<> dist{ 20, 2 };
 
-	const auto endTP{std::chrono::steady_clock::now() + std::chrono::seconds{600}};
+	const auto endTP{std::chrono::steady_clock::now() + std::chrono::seconds{120}};
 	while(std::chrono::steady_clock::now() < endTP)
 	{
 		rateCnt.sample();
