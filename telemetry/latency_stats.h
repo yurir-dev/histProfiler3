@@ -106,6 +106,7 @@ namespace hprof
 
 		os << std::string_view{hist._label.data(), hist._labelLen}
 		   << '\n'
+		   << std::fixed << std::setprecision(3)
 		   << "#buckets: " << hist.getNumBuckets()
 		   << ", #samples: " << hist._numSamples
 		   << ", #overflows: " << hist._overfows
@@ -114,6 +115,7 @@ namespace hprof
 		   << "mean: " << meanUnits << "(" << meanNS << " ns)"
 		   << ", median: " << median(hist)
 		   << ", min: " << hist._minSample << "ns, max: " << hist._maxSample << "ns"
+		   << std::defaultfloat
 		   << '\n';
 
 		for (size_t i = 0; i < hist._buckets.size(); ++i)
