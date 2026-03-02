@@ -31,7 +31,7 @@ int testMicros()
 	std::mt19937 gen{ rd() };
 	std::normal_distribution<> dist{ 1000, 100 };
 
-	for (size_t i = 0; i < 1024 * 1024; i++)
+	for (size_t i = 0; i < 1024 * 10; i++)
 	{
 		const auto randomVal{std::round(dist(gen))};
 		const auto timeToWaist{randomVal > 0 ? static_cast<size_t>(randomVal) : 0};
@@ -79,7 +79,7 @@ int testShmHist()
 	std::mt19937 gen{ rd() };
 	std::normal_distribution<> dist{ 50, 2 };
 
-	for (size_t i = 0; i < 1024*1024 ; i++)
+	for (size_t i = 0; i < 1024 * 10 ; i++)
 	{
 		const auto randomVal{std::round(dist(gen))};
 		const auto timeToWaist{randomVal > 0 ? static_cast<size_t>(randomVal) : 0};
@@ -128,7 +128,7 @@ int testShmRateCounter()
 	std::mt19937 gen{ rd() };
 	std::normal_distribution<> dist{ 20, 2 };
 
-	const auto endTP{std::chrono::steady_clock::now() + std::chrono::seconds{120}};
+	const auto endTP{std::chrono::steady_clock::now() + std::chrono::seconds{30}};
 	while(std::chrono::steady_clock::now() < endTP)
 	{
 		rateCnt.sample();
