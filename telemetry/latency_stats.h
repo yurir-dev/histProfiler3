@@ -46,6 +46,7 @@ namespace hprof
 
 			_labelLen = std::min(_label.size(), label.size());
 			std::strncpy(_label.data(), label.c_str(), _labelLen);
+			_label.data()[_labelLen] = '\0';
 
 			_ready.store(true, std::memory_order_release);
 		}
@@ -71,7 +72,7 @@ namespace hprof
 			}
 			else
 			{
-				_overfows.fetch_add(1, std::memory_order_relaxed);;
+				_overfows.fetch_add(1, std::memory_order_relaxed);
 			}
 		}
 
@@ -94,7 +95,7 @@ namespace hprof
 		uint64_t _labelLen{0};
 		std::array<char, 256> _label;
 		uint64_t _bucketsLen;
-		std::array<std::atomic<uint64_t>, NumBucket + 1> _buckets;
+		std::array<std::atomic<uint64_t>, NumBucket> _buckets;
 		std::atomic<bool> _ready{false};
 	};
 
@@ -131,6 +132,11 @@ namespace hprof
 		ScopedHistSampler(HistType& hist)
 		: _histRef{hist}, _startTP{std::chrono::steady_clock::now()}
 		{}
+		ScopedHistSampler(ScopedHistSampler&) = delete;
+		ScopedHistSampler& operator=(const ScopedHistSampler&) = delete;
+		ScopedHistSampler(ScopedHistSampler&&) = delete;
+		ScopedHistSampler& operator=(ScopedHistSampler&&) = delete;
+
 		~ScopedHistSampler()
 		{
 			const auto endTP = std::chrono::steady_clock::now();
@@ -153,6 +159,7 @@ namespace hprof
 
 			_labelLen = std::min(_label.size(), label.size());
 			std::strncpy(_label.data(), label.c_str(), _labelLen);
+			_label.data()[_labelLen] = '\0';
 
 			_ready.store(true, std::memory_order_release);
 		}
@@ -236,6 +243,8 @@ namespace hprof
 	template<typename ObjType>
 	class ShmFile final
 	{
+		static_assert(alignof(ObjType) <= alignof(std::max_align_t), "ObjType alignment is too large for mmap");
+		static_assert(sizeof(ObjType) % alignof(ObjType) == 0, "ObjType size must be multiple size of it's alignment");
 	public:	
 		ShmFile() = default;
 		template <typename... Ts>
@@ -259,7 +268,7 @@ namespace hprof
 			}
 			else
 			{
-				throw std::runtime_error{"Unvalid  OpenFilePolicy: " + std::to_string(static_cast<int>(opf))};
+				throw std::runtime_error{"Invalid OpenFilePolicy: " + std::to_string(static_cast<int>(opf))};
 			}
 
 			if (raii._fd == -1)
@@ -301,6 +310,8 @@ namespace hprof
 				_objPtr = reinterpret_cast<ObjType*>(beginAddr);
 				if (!_objPtr->verifyMagic())
 				{
+					munmap(beginAddr, sizeof(ObjType));
+					_objPtr = nullptr;
 					throw std::runtime_error{"FAILED to verify magic, corrupted file:  " + std::string{filename}};
 				}
 			}
