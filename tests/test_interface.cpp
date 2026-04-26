@@ -26,16 +26,19 @@ void wasteTime(size_t cnt)
 	}
 }
 
+template <template <typename> typename SamplerType>
 int testMicros()
 {
 	std::cout << '\n' << hprof::TimeHeader{} << " : start " << __FUNCTION__ << std::endl;
 	hprof::ScopedTimer st{__FUNCTION__};
 
-	hprof::Histogram<200, 1000> hist{"basic test of micros"};
+	using HistMicros = hprof::Histogram<200, 1000>; 
+
+	HistMicros hist{"basic test of micros"};
 
 	std::random_device rd{};
 	std::mt19937 gen{ rd() };
-	std::normal_distribution<> dist{ 1000, 100 };
+	std::normal_distribution<> dist{ 50, 10 };
 
 	const auto endTP{std::chrono::steady_clock::now() + std::chrono::seconds{15}};
 	while(std::chrono::steady_clock::now() < endTP)
@@ -43,7 +46,7 @@ int testMicros()
 		const auto randomVal{std::round(dist(gen))};
 		const auto timeToWaist{randomVal > 0 ? static_cast<size_t>(randomVal) : 0};
 		{
-			hprof::ScopedHistSampler shs{hist};
+			SamplerType<HistMicros> shs{hist};
 			wasteTime(timeToWaist);
 		}
 	}
@@ -52,6 +55,8 @@ int testMicros()
 
 	return 0;
 }
+
+template <template <typename> typename SamplerType>
 int testMillis()
 {
 	std::cout << '\n' << hprof::TimeHeader{} << " : start " << __FUNCTION__ << std::endl;
@@ -236,14 +241,24 @@ int testRateTrigger()
 
 int main(int /*argc*/, char* /*argv*/ [])
 {
-	if (auto res = testMicros() ; res != 0)
+	if (auto res = testMicros<hprof::ScopedHistSampler>() ; res != 0)
 	{
 		return res;
 	}
-	if (auto res = testMillis() ; res != 0)
+	if (auto res = testMicros<hprof::ScopedHistRTDCSampler>() ; res != 0)
 	{
 		return res;
 	}
+	
+	if (auto res = testMillis<hprof::ScopedHistSampler>() ; res != 0)
+	{
+		return res;
+	}
+	if (auto res = testMillis<hprof::ScopedHistRTDCSampler>() ; res != 0)
+	{
+		return res;
+	}
+
 	if (auto res = testShmHist() ; res != 0)
 	{
 		return res;

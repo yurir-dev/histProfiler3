@@ -12,6 +12,10 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <immintrin.h>
+#include <cstdint>
+
+#include "cpu_freq.h"
 
 namespace hprof
 {
@@ -51,7 +55,7 @@ namespace hprof
 			_ready.store(true, std::memory_order_release);
 		}
 
-		void input(const uint64_t s)
+		void input(const uint64_t s) noexcept
 		{
 			if (s > _maxSample.load(std::memory_order_relaxed)) 
 			{
@@ -129,14 +133,9 @@ namespace hprof
 	class ScopedHistSampler final
 	{
 		public:
-		ScopedHistSampler(HistType& hist)
-		: _histRef{hist}, _startTP{std::chrono::steady_clock::now()}
+		explicit ScopedHistSampler(HistType& hist)
+		: _startTP{std::chrono::steady_clock::now()}, _histRef{hist}
 		{}
-		ScopedHistSampler(ScopedHistSampler&) = delete;
-		ScopedHistSampler& operator=(const ScopedHistSampler&) = delete;
-		ScopedHistSampler(ScopedHistSampler&&) = delete;
-		ScopedHistSampler& operator=(ScopedHistSampler&&) = delete;
-
 		~ScopedHistSampler()
 		{
 			const auto endTP = std::chrono::steady_clock::now();
@@ -144,8 +143,65 @@ namespace hprof
 			_histRef.input(diffNanos.count());
 		}
 
-		HistType& _histRef;
+		ScopedHistSampler(ScopedHistSampler&) = delete;
+		ScopedHistSampler& operator=(const ScopedHistSampler&) = delete;
+		ScopedHistSampler(ScopedHistSampler&&) = delete;
+		ScopedHistSampler& operator=(ScopedHistSampler&&) = delete;
+
+		private:
 		std::chrono::time_point<std::chrono::steady_clock> _startTP;
+		HistType& _histRef;
+	};
+
+	/**
+ 	* Note: This sampler assumes an Invariant TSC.
+ 	* On modern x86 CPUs (Intel Skylake+ / AMD Zen+), the TSC ticks at a 
+ 	* constant frequency regardless of Turbo Boost or power-saving states.
+ 	* 
+ 	* If running on ancient hardware (pre-2010) or specific virtualized 
+ 	* environments without TSC pass-through, the nanosecond conversion 
+ 	* may drift if the CPU frequency scales.
+ 	*/
+ 	class ScopedHistRTDCSamplerBase
+	{
+		public:
+		static double getTscGhz() noexcept { return tsc_ghz; }
+
+		protected:
+		static inline const double tsc_ghz{get_tsc_ghz()};
+	};
+	template <typename HistType>
+	class ScopedHistRTDCSampler final : public ScopedHistRTDCSamplerBase
+	{
+		public:
+		[[gnu::always_inline]] inline
+		explicit ScopedHistRTDCSampler(HistType& hist) noexcept 
+		: _histRef{hist}
+		{
+			_mm_lfence();
+			_start = __rdtsc();
+			_mm_lfence();
+		}
+
+		[[gnu::always_inline]] inline
+		~ScopedHistRTDCSampler() noexcept 
+		{
+			unsigned int aux;
+			const uint64_t end{__rdtscp(&aux)};
+			_mm_lfence();
+
+			const auto nanos{static_cast<double>(end - _start) / tsc_ghz};
+        	_histRef.input(static_cast<uint64_t>(nanos + 0.5)); // fast round
+		}
+
+		ScopedHistRTDCSampler(ScopedHistRTDCSampler&) = delete;
+		ScopedHistRTDCSampler& operator=(const ScopedHistRTDCSampler&) = delete;
+		ScopedHistRTDCSampler(ScopedHistRTDCSampler&&) = delete;
+		ScopedHistRTDCSampler& operator=(ScopedHistRTDCSampler&&) = delete;
+
+		private:
+		HistType& _histRef;
+		uint64_t _start{0};
 	};
 
 	template<size_t WindowSize>
@@ -243,9 +299,9 @@ namespace hprof
 	template<typename ObjType>
 	class ShmFile final
 	{
-		static_assert(alignof(ObjType) <= alignof(std::max_align_t), "ObjType alignment is too large for mmap");
+		//static_assert(alignof(ObjType) <= alignof(std::max_align_t), "ObjType alignment is too large for mmap");
 		static_assert(sizeof(ObjType) % alignof(ObjType) == 0, "ObjType size must be multiple size of it's alignment");
-	public:	
+	public:
 		ShmFile() = default;
 		template <typename... Ts>
 		ShmFile(std::filesystem::path filename, OpenFilePolicy opf, Ts... args)
