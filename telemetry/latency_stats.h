@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <immintrin.h>
 #include <cstdint>
+#include <time.h>
 
 #include "cpu_freq.h"
 
@@ -104,7 +105,7 @@ namespace hprof
 	};
 
 	template <typename HistType>
-	std::ostream& dumpHistogram(std::ostream& os, const HistType& hist)
+	std::ostream& dumpHistogram(std::ostream& os, const HistType& hist, bool summaryOnly = false)
 	{
 		auto meanNS{safeDiv(hist._sum, hist._numSamples)};
 		auto meanUnits{safeDiv(meanNS, hist._samplesPerBucket)};
@@ -123,8 +124,11 @@ namespace hprof
 		   << std::defaultfloat
 		   << '\n';
 
-		for (size_t i = 0; i < hist._buckets.size(); ++i)
-			os << hist._buckets[i] << '\n';
+		if (!summaryOnly)
+		{
+			for (size_t i = 0; i < hist._buckets.size(); ++i)
+				os << hist._buckets[i] << '\n';
+		}
 
 		return os;
 	}
@@ -133,9 +137,12 @@ namespace hprof
 	class ScopedHistSampler final
 	{
 		public:
+		[[gnu::always_inline]] inline
 		explicit ScopedHistSampler(HistType& hist)
 		: _startTP{std::chrono::steady_clock::now()}, _histRef{hist}
 		{}
+
+		[[gnu::always_inline]] inline
 		~ScopedHistSampler()
 		{
 			const auto endTP = std::chrono::steady_clock::now();
@@ -171,7 +178,7 @@ namespace hprof
 		static inline const double tsc_ghz{get_tsc_ghz()};
 	};
 	template <typename HistType>
-	class ScopedHistRTDCSampler final : public ScopedHistRTDCSamplerBase
+	class ScopedHistRTDCSampler final : private ScopedHistRTDCSamplerBase
 	{
 		public:
 		[[gnu::always_inline]] inline
@@ -203,6 +210,63 @@ namespace hprof
 		HistType& _histRef;
 		uint64_t _start{0};
 	};
+
+	/*
+	ClockType:
+	CLOCK_MONOTONIC - Most general profiling, Represents absolute elapsed time since some arbitrary point (usually boot).
+	CLOCK_MONOTONIC_RAW - Similar to CLOCK_MONOTONIC, but it is not subject to NTP frequency adjustments.
+	CLOCK_REALTIME - Displaying the current time/date to a user, Avoid for profiling
+	CLOCK_PROCESS_CPUTIME_ID - Only ticks when the CPU is actually executing your process's instructions. 
+							   If your thread is "sleeping" or waiting for I/O, this clock stops.
+							   This is great for seeing CPU cost but terrible for measuring "latency" (which includes wait time).
+	*/
+	template <typename HistType, clockid_t ClockType = CLOCK_MONOTONIC_RAW>
+	class ScopedHistClockSampler final
+	{
+		static constexpr long InvalidNanosVal{-1};
+
+		public:
+		[[gnu::always_inline]] inline
+		explicit ScopedHistClockSampler(HistType& hist)
+		: _startTP{0, InvalidNanosVal}, _histRef{hist}
+		{
+			if (clock_gettime(ClockType, &_startTP) != 0)
+			{
+				_startTP.tv_nsec = InvalidNanosVal;
+			}
+		}
+
+		[[gnu::always_inline]] inline
+		~ScopedHistClockSampler()
+		{
+			struct timespec endTP;
+			if (_startTP.tv_nsec == InvalidNanosVal || (clock_gettime(ClockType, &endTP) != 0))
+			{
+				/*
+					clock_gettime failed to fetch time, 
+					insert whatever error handling is appropriate.
+				*/
+				return;
+			}
+
+			uint64_t diffNanos = endTP.tv_nsec < _startTP.tv_nsec ?
+								(static_cast<uint64_t>(endTP.tv_sec - _startTP.tv_sec - 1) * 1'000'000'000ULL) + (1'000'000'000ULL + endTP.tv_nsec - _startTP.tv_nsec) 
+								:
+								(static_cast<uint64_t>(endTP.tv_sec - _startTP.tv_sec) * 1'000'000'000ULL) + (endTP.tv_nsec - _startTP.tv_nsec);
+
+			_histRef.input(diffNanos);
+		}
+
+		ScopedHistClockSampler(ScopedHistClockSampler&) = delete;
+		ScopedHistClockSampler& operator=(const ScopedHistClockSampler&) = delete;
+		ScopedHistClockSampler(ScopedHistClockSampler&&) = delete;
+		ScopedHistClockSampler& operator=(ScopedHistClockSampler&&) = delete;
+
+		private:
+		struct timespec _startTP;
+		HistType& _histRef;
+	};
+
 
 	template<size_t WindowSize>
 	class RateCounter final

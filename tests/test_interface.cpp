@@ -239,13 +239,73 @@ int testRateTrigger()
 	return __LINE__;
 }
 
+template <template <typename> typename SamplerType>
+int testSamplerOverhead()
+{
+	hprof::Histogram<1000, 1> hist{"testSamplerOverhead"};
+	for(int i = 0; i < 1000000; ++i)
+	{
+    	SamplerType sampler(hist);
+    	// Do absolutely nothing
+	}
+	hprof::dumpHistogram(std::cout, hist, true /*summaryOnly*/);
+
+	return 0;
+}
+
+int testProcessCpuTime()
+{
+	std::random_device rd{};
+	std::mt19937 gen{ rd() };
+	std::normal_distribution<> dist{ 100, 10 };
+
+	hprof::Histogram<100, 1> hist{"testProcessCpuTime , micros"};
+	for(int i = 0; i < 1000; ++i)
+	{
+		const auto randomVal{std::round(dist(gen))};
+		const auto timeToWaist{randomVal > 0 ? static_cast<size_t>(randomVal) : 0};
+
+		{
+    		hprof::ScopedHistClockSampler<decltype(hist), CLOCK_PROCESS_CPUTIME_ID> sampler(hist);    	
+			wasteTime(timeToWaist); // should count only this
+			std::this_thread::sleep_for(std::chrono::milliseconds{1}); // should not count this
+		}
+	}
+
+	hprof::dumpHistogram(std::cout, hist, false /*summaryOnly*/);
+
+	return 0;
+}
+
 int main(int /*argc*/, char* /*argv*/ [])
 {
+	if (auto res = testSamplerOverhead<hprof::ScopedHistSampler>() ; res != 0)
+	{
+		return res;
+	}
+	if (auto res = testSamplerOverhead<hprof::ScopedHistRTDCSampler>() ; res != 0)
+	{
+		return res;
+	}
+	if (auto res = testSamplerOverhead<hprof::ScopedHistClockSampler>() ; res != 0)
+	{
+		return res;
+	}
+
+	if (auto res = testProcessCpuTime() ; res != 0)
+	{
+		return res;
+	}
+
 	if (auto res = testMicros<hprof::ScopedHistSampler>() ; res != 0)
 	{
 		return res;
 	}
 	if (auto res = testMicros<hprof::ScopedHistRTDCSampler>() ; res != 0)
+	{
+		return res;
+	}
+	if (auto res = testMicros<hprof::ScopedHistClockSampler>() ; res != 0)
 	{
 		return res;
 	}
@@ -255,6 +315,10 @@ int main(int /*argc*/, char* /*argv*/ [])
 		return res;
 	}
 	if (auto res = testMillis<hprof::ScopedHistRTDCSampler>() ; res != 0)
+	{
+		return res;
+	}
+	if (auto res = testMillis<hprof::ScopedHistClockSampler>() ; res != 0)
 	{
 		return res;
 	}
