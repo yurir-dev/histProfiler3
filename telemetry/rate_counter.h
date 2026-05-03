@@ -94,8 +94,8 @@ namespace hprof
 		std::atomic<bool> _ready{false};
 	};
 
-	template <typename RateCounterType>
-	std::ostream& dumpRateCounter(std::ostream& os, const RateCounterType& rateCnt)
+	template<size_t WindowSize>
+	std::ostream& operator<<(std::ostream& os, const RateCounter<WindowSize>& rateCnt)
 	{
 		bool first = true;
 		os << std::string_view{rateCnt._label.data(), rateCnt._labelLen} << "\n[";

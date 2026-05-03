@@ -142,7 +142,7 @@ int testRateCounter()
 		std::this_thread::sleep_for(std::chrono::milliseconds{timeToWaist});
 	}
 
-	hprof::dumpRateCounter(std::cout, rateCnt);
+	std::cout << rateCnt << std::endl;
 
 	return 0;
 }
@@ -177,7 +177,7 @@ int testShmRateCounter()
 		std::this_thread::sleep_for(std::chrono::milliseconds{timeToWaist});
 	}
 
-	hprof::dumpRateCounter(std::cout, rateCnt);
+	std::cout << rateCnt << std::endl;
 
 	return 0;
 }
@@ -220,7 +220,7 @@ int testShmRateCounterWithGaps()
 		}
 	}
 
-	hprof::dumpRateCounter(std::cout, rateCnt);
+	std::cout << rateCnt << std::endl;
 
 	return 0;
 }
