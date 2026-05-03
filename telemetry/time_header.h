@@ -1,17 +1,18 @@
 #pragma once
 
-#include <ctime> // for localtime_r
-#include <chrono>
-#include <ostream>
-#include <iomanip>
+#include <ctime>        // For std::time_t, std::tm, localtime_r
+#include <chrono>       // For std::chrono::system_clock
+#include <ostream>      // For std::ostream
+#include <iomanip>      // For std::put_time, std::setfill, std::setw
 
 namespace hprof{
 
     struct TimeHeader
     {
-        TimeHeader(const char* format = "%H:%M:%S"): _format{format}{}
+        explicit TimeHeader(const char* format = "%H:%M:%S")
+        : _now{std::chrono::system_clock::now()}, _format{format}{}
 
-        std::chrono::time_point<std::chrono::system_clock> _now{std::chrono::system_clock::now()};
+        std::chrono::time_point<std::chrono::system_clock> _now;
         const char* _format{"%H:%M:%S"};
     };
     inline std::ostream& operator<<(std::ostream& os, const TimeHeader& th)
@@ -27,3 +28,4 @@ namespace hprof{
                   << "." << std::setfill('0') << std::setw(6) << micros;
     }
 }
+

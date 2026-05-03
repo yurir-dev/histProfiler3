@@ -1,6 +1,12 @@
 #pragma once
 
-#include <chrono>
+#include <chrono>       // For std::chrono, time_point, duration_cast
+#include <iostream>     // For std::cout (default parameter in constructor)
+#include <ostream>      // For std::ostream
+#include <iomanip>      // For std::fixed, std::setprecision
+#include <type_traits>  // For std::is_same_v, std::is_void_v
+#include <ratio>        // For std::ratio (used in printSmartDuration)
+
 #include "time_header.h"
 
 namespace hprof{

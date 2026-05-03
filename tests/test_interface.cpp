@@ -9,6 +9,8 @@
 #include "latency_stats.h"
 #include "rate_trigger.h"
 #include "scoped_timer.h"
+#include "rate_counter.h"
+#include "shm_file.h"
 
 void move_to_register(const volatile void* ptr) {
 	// Tells the compiler: "I'm using this memory, don't optimize the math that created it."
@@ -92,6 +94,11 @@ int testShmHist()
 	hprof::ShmFile<hprof::Histogram<100, 1'000'000>> shmCont{"basicTestMillisInShm", 
 															hprof::OpenFilePolicy::CreateNew,
 															"basic test of millis"};
+	if (!shmCont)
+	{
+		std::cerr << "failed to create shmfile" << std::endl;
+		return __LINE__;
+	}
 	auto& hist{shmCont.get()};
 
 	std::random_device rd{};
@@ -148,6 +155,12 @@ int testShmRateCounter()
 	hprof::ShmFile<hprof::RateCounter<128>> shmCont{"basicTestRateCounter", 
 													hprof::OpenFilePolicy::ReuseIfExists,
 													"basic test of rate counter"};
+	if (!shmCont)
+	{
+		std::cerr << "failed to create shmfile" << std::endl;
+		return __LINE__;
+	}
+
 	auto& rateCnt{shmCont.get()};
 
 	std::random_device rd{};
@@ -177,6 +190,12 @@ int testShmRateCounterWithGaps()
 	hprof::ShmFile<hprof::RateCounter<128>> shmCont{"basicTestRateCounterGaps", 
 													hprof::OpenFilePolicy::ReuseIfExists,
 													"gap detection test of rate counter"};
+	if (!shmCont)
+	{
+		std::cerr << "failed to create shmfile" << std::endl;
+		return __LINE__;
+	}
+
 	auto& rateCnt{shmCont.get()};
 
 	std::random_device rd{};
@@ -283,7 +302,7 @@ int main(int /*argc*/, char* /*argv*/ [])
 	{
 		return res;
 	}
-	if (auto res = testSamplerOverhead<hprof::ScopedHistRTDCSampler>() ; res != 0)
+	if (auto res = testSamplerOverhead<hprof::ScopedHistRdtscSampler>() ; res != 0)
 	{
 		return res;
 	}
@@ -301,7 +320,7 @@ int main(int /*argc*/, char* /*argv*/ [])
 	{
 		return res;
 	}
-	if (auto res = testMicros<hprof::ScopedHistRTDCSampler>() ; res != 0)
+	if (auto res = testMicros<hprof::ScopedHistRdtscSampler>() ; res != 0)
 	{
 		return res;
 	}
@@ -314,7 +333,7 @@ int main(int /*argc*/, char* /*argv*/ [])
 	{
 		return res;
 	}
-	if (auto res = testMillis<hprof::ScopedHistRTDCSampler>() ; res != 0)
+	if (auto res = testMillis<hprof::ScopedHistRdtscSampler>() ; res != 0)
 	{
 		return res;
 	}
