@@ -13,7 +13,7 @@
 
 namespace hprof
 {
-    double get_tsc_ghz()
+    inline double get_tsc_ghz()
     {
         // 1. Hardware Method: CPUID Leaf 0x15 (Intel Skylake+)
         unsigned int eax, ebx, ecx, edx;
